@@ -1,0 +1,77 @@
+// https://github.com/promlabs/lezer-promql/blob/master/src/promql.grammar
+
+!?aggregate_op : "avg" | "bottommk" | "count" | "count_values" | "group" | "max" | "min"
+  |  "quantile" | "stddev" | "stdvar" | "sum" | "topk"
+!?binary_expr_op : "-" | "+" | "*" | "%" | "/" | "==" | "!=" | "<=" | "<"
+  | ">=" | ">" | "=~" | "=" | "!~" | "^"
+!?unary_op : "-" | "+"
+!?match_op : "=" | "!=" | "~=" | "!~"
+!?at_modifier_preprocessors : "start" | "end"
+BY : "by"
+BOOL : "bool"
+WITHOUT : "without"
+ON: "on"
+OFFSET: "offset"
+NEG: "-"
+IGNORING: "ignoring"
+GROUP_LEFT: "group_left"
+GROUP_RIGHT: "group_right"
+IDENT: /[a-zA-Z_:][a-zA-Z0-9_:]*/
+LABEL: /[a-zA-Z_][a-zA-Z0-9_]*/
+DURATION: /[0-9]+/("y" | "w" | "m" | "d" | "h" | "s" | "ms")
+%import common.ESCAPED_STRING
+%import common.SIGNED_NUMBER
+%import common.WS
+%ignore WS
+
+ident: IDENT
+
+expr : aggregate_expr 
+  | binary_expr
+  | function_call
+  | matrix_selector
+  | SIGNED_NUMBER
+  | offset_expr
+  | paren_expr
+  | ESCAPED_STRING
+  | subquery_expr
+  | unary_expr
+  | vector_selector
+  | step_invariant_expr
+
+
+?aggregate_expr : aggregate_op function_call_body
+  | aggregate_op aggregate_modifier function_call_body
+  | aggregate_op function_call_body aggregate_modifier
+
+aggregate_modifier : (BY | WITHOUT) grouping_labels
+
+binary_expr : expr binary_expr_op bin_modifiers expr
+on_or_ignoring: (ON | IGNORING) grouping_labels
+bin_modifiers : BOOL? (on_or_ignoring (GROUP_LEFT | GROUP_RIGHT) grouping_labels?)?
+
+!grouping_labels: "(" (LABEL ("," LABEL)* )? ")"
+!function_call: IDENT function_call_body
+!function_call_body: "(" (expr ("," expr)* )?")"
+
+!paren_expr: "(" expr ")"
+offset_expr: expr OFFSET NEG? duration
+!matrix_selector: expr "[" duration "]"
+!subquery_expr: expr "[" duration ":" duration? "]"
+// Not clear
+unary_expr : unary_op expr
+vector_selector : vector_selector_ident
+  | vector_selector_matchers
+  | vector_selector_both
+
+
+vector_selector_both : metric_identifier label_matchers
+vector_selector_ident : metric_identifier
+vector_selector_matchers : label_matchers
+
+label_matchers : "{" (label_matcher ("," label_matcher)+)? "}"
+label_matcher : IDENT match_op ESCAPED_STRING
+metric_identifier : IDENT
+
+!step_invariant_expr : expr "at" (SIGNED_NUMBER | (at_modifier_preprocessors "(" ")"))
+duration: DURATION+
