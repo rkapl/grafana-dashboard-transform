@@ -19,3 +19,6 @@ To see all the options, run `./grafana-transform.py --help`.
 
 ## Limitations
 It is assumed that only Prometheus Query Languages is used by the panels.
+
+## License
+Public Domain
